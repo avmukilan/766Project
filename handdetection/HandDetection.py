@@ -1,17 +1,29 @@
 import cv2
 import numpy as np
 
+def diffImg(t0, t1, t2):
+  d1 = cv2.absdiff(t2, t1)
+  d2 = cv2.absdiff(t1, t0)
+  return cv2.bitwise_and(d1, d2)
+
 #Open Camera object
 capture = cv2.VideoCapture(0)
 
+
 #Decrease frame size
-capture.set(cv2.CAP_PROP_FRAME_WIDTH, 1000)
+capture.set(cv2.CAP_PROP_FRAME_WIDTH,  600)
 capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 600)
 
 # Creating a window for HSV track bars
 cv2.namedWindow('HSV_TrackBar')
 # Starting with 100's to prevent error while masking
 #h,s,v = 100,100,100
+
+# Read three images first:
+t_minus = cv2.cvtColor(capture.read()[1], cv2.COLOR_RGB2GRAY)
+first_frame = cv2.cvtColor(capture.read()[1], cv2.COLOR_RGB2GRAY)
+t       = cv2.cvtColor(capture.read()[1], cv2.COLOR_RGB2GRAY)
+t_plus  = cv2.cvtColor(capture.read()[1], cv2.COLOR_RGB2GRAY)
 
 def callableObject(x):
     pass
@@ -31,12 +43,29 @@ while(True):
     #Convert to HSV color space
     hsv = cv2.cvtColor(blur,cv2.COLOR_BGR2HSV)
 
-    #Create a binary image with where white will be skin colors and rest is black
-    mask2 = cv2.inRange(hsv,np.array([2,50,50]),np.array([15,255,255]))
+    t_minus = t
+    t = t_plus
+    t_plus = cv2.cvtColor(capture.read()[1], cv2.COLOR_RGB2GRAY)
+
+    frameDelta = diffImg(first_frame, t, t_plus)
+    ret, thresh_motion = cv2.threshold(frameDelta, 10, 255, 0)
 
     #Kernel matrices for morphological transformation
     kernel_square = np.ones((11,11),np.uint8)
     kernel_ellipse= cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(5,5))
+
+    dilation = cv2.dilate(thresh_motion,kernel_ellipse,iterations = 1)
+    erosion = cv2.erode(dilation,kernel_square,iterations = 1)
+    dilation2 = cv2.dilate(erosion,kernel_ellipse,iterations = 1)
+    filtered = cv2.medianBlur(dilation2,5)
+    kernel_ellipse= cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(8,8))
+    dilation2 = cv2.dilate(filtered,kernel_ellipse,iterations = 1)
+    kernel_ellipse= cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(5,5))
+    dilation3 = cv2.dilate(filtered,kernel_ellipse,iterations = 1)
+    median_motion = cv2.medianBlur(dilation2,5)
+
+    #Create a binary image with where white will be skin colors and rest is black
+    mask2 = cv2.inRange(hsv,np.array([2,50,50]),np.array([15,255,255]))
 
     #Perform morphological transformations to filter out the background noise
     dilation = cv2.dilate(mask2,kernel_ellipse,iterations = 1)
@@ -48,10 +77,19 @@ while(True):
     kernel_ellipse= cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(5,5))
     dilation3 = cv2.dilate(filtered,kernel_ellipse,iterations = 1)
     median = cv2.medianBlur(dilation2,5)
-    ret,thresh = cv2.threshold(median,127,255,0)
+    median_merge=cv2.bitwise_and(median, median_motion)
+
+
+    ret,thresh = cv2.threshold(median_merge,127,255,0)
+    #thresh_mode = cv2.bitwise_and(thresh, median_motion)
 
     image,contours, _ = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
-    cv2.imshow('Dilation',median)
+
+    cv2.imshow('median_merge',median_merge)
+    cv2.imshow('median', median)
+    #cv2.imshow('thresh',thresh)
+    cv2.imshow('median_motion',median_motion)
+
 
     #Find Max contour area (Assume that hand is in the frame)
     max_area=100
@@ -62,6 +100,8 @@ while(True):
         if(area>max_area):
             max_area=area
             ci=i
+    if ci == 0:
+        continue
     cnts = contours[ci]
     hull = cv2.convexHull(cnts)
     #Find convex defects
