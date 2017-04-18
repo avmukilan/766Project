@@ -1,78 +1,75 @@
-
 import numpy as np
 import cv2
+import os
+import datetime
+import pickle
+from sklearn.externals import joblib
 
-from sklearn import tree
-from sklearn.cross_validation import train_test_split
 from sklearn.naive_bayes import GaussianNB
-from sklearn.neural_network import MLPClassifier
+
+class GenerateSPMModel:
+
+    def trainAndPickle(self):
+        self.allRgbData = np.empty([0, 4], dtype=int)
+        self.allhsvData = np.empty([0, 4], dtype=int)
+        originalDir = "data/rbg/"
+        binaryDir = "data/hsv/"
+        i = 0
+        for file in os.listdir(originalDir):
+            if i >= 5:
+                break
+            rgbFile = originalDir + file
+            hsvFile = binaryDir + file
+            rgbData = np.genfromtxt(rgbFile, dtype=np.int, delimiter=",")
+            hsvData = np.genfromtxt(hsvFile, dtype=np.int, delimiter=",")
+            self.allRgbData = np.concatenate((self.allRgbData,rgbData),axis=0)
+            self.allhsvData = np.concatenate((self.allhsvData,hsvData),axis=0)
+            i += 1
+        print("Starting Training")
+        start = datetime.datetime.now()
+        models = self.fit()
+        rgbModel = joblib.dump(models[0],'rgbModelPickle.pkl')
+        hsvModel = joblib.dump(models[1],'hsvModelPickle.pkl')
+        print(rgbModel)
+        print(hsvModel)
+        message = "Train Time -" + str(datetime.datetime.now() - start)
+        print(message)
+
+    def fit(self):
+        rgblabels= self.allRgbData[:,3]
+        rgbDataTrain= self.allRgbData[:,0:3]
+        hsvlabels= self.allhsvData[:,3]
+        hsvDataTrain= self.allhsvData[:,0:3]
+        clfRgb = GaussianNB()
+        clfHsv = GaussianNB()
+        clfRgb = clfRgb.fit(rgbDataTrain,rgblabels)
+        clfHsv = clfHsv.fit(hsvDataTrain, hsvlabels)
+        return clfRgb, clfHsv
+
+    def predict(self,image):
+        nrgb = self.normalizeRGB(image)
+        hsv = cv2.cvtColor(image,cv2.COLOR_RGB2HSV)
+        ndarray = np.reshape(nrgb, (nrgb.shape[0] * nrgb.shape[1], 3))
+        hsvndArrap = np.reshape(hsv, (hsv.shape[0] * hsv.shape[1], 3))
+        predict1 = self.clfRgb.predict(ndarray)
+        predict2 = self.clfHsv.predict(hsvndArrap)
+        predict = cv2.bitwise_and(predict1, predict2)
+        return np.reshape(predict,(nrgb.shape[0] ,nrgb.shape[1]))
+
+    def normalizeRGB(self,img):
+        img_yuv = cv2.cvtColor(img, cv2.COLOR_BGR2YUV)
+        img_yuv[:,:,0] = cv2.equalizeHist(img_yuv[:,:,0])
+        img_output = cv2.cvtColor(img_yuv, cv2.COLOR_YUV2BGR)
+        return img_output
 
 
-def ReadData():
-    #Data in format [B G R Label] from
-    data = np.genfromtxt('data/Skin_NonSkin.txt', dtype=np.int32)
-
-    labels= data[:,3]
-    data= data[:,0:3]
-
-    return data, labels
-
-def BGR2HSV(bgr):
-    bgr= np.reshape(bgr,(bgr.shape[0],1,3))
-    hsv= cv2.cvtColor(np.uint8(bgr), cv2.COLOR_BGR2HSV)
-    hsv= np.reshape(hsv,(hsv.shape[0],3))
-
-    return hsv
-
-
-def TrainTree(data, labels, flUseHSVColorspace):
-    if(flUseHSVColorspace):
-        data= BGR2HSV(data)
-
-    trainData, testData, trainLabels, testLabels = train_test_split(data, labels, test_size=0.20, random_state=42)
-
-    print(trainData.shape)
-    print(trainLabels.shape)
-    print(testData.shape)
-    print(testLabels.shape)
-
-    clf = GaussianNB()
-    #clf = MLPClassifier(solver='lbfgs', alpha=1e-5,hidden_layer_sizes=(3, 1), random_state=1)
-    clf = clf.fit(data, labels)
-    #print(clf.feature_importances_)
-    #print(clf.score(testData, testLabels))
-
-    return clf
-
-def ApplyToImage(path, flUseHSVColorspace):
-    data, labels= ReadData()
-    clf= TrainTree(data, labels, flUseHSVColorspace)
-
-    img= cv2.imread(path)
-    cv2.imshow("Image",img)
-    #print(img.shape)
-    data= np.reshape(img,(img.shape[0]*img.shape[1],3))
-    #print(data.shape)
-
-    if(flUseHSVColorspace):
-        data= BGR2HSV(data)
-
-    predictedLabels= clf.predict(data)
-
-    imgLabels= np.reshape(predictedLabels,(img.shape[0],img.shape[1],1))
-    image = (-(imgLabels - 1) + 1) * 255
-    if (flUseHSVColorspace):
-        cv2.imwrite('results/result_HSV.png', (image))# from [1 2] to [0 255]
-    else:
-        cv2.imwrite('results/result_RGB.png', (image))
-
-    return image
-
-
-#---------------------------------------------
-image1 = ApplyToImage("Images/josh-hartnett-Poster-thumb.jpg", True)
-image2 = ApplyToImage("Images/josh-hartnett-Poster-thumb.jpg", False)
-bitwise_and = cv2.bitwise_and(image1, image2)
-imageToProcess = (-(bitwise_and-1)+1)*255
-imageToWrite = cv2.bitwise_not(imageToProcess)
-cv2.imwrite('results/result.png',imageToWrite)
+if __name__ == "__main__":
+    spm = GenerateSPMModel()
+    spm.trainAndPickle()
+    #start = datetime.datetime.now()
+    #imageToTest = cv2.imread("Images/josh-hartnett-Poster-thumb.jpg")
+    #imageToTest = cv2.imread("Images/test.png")
+    #predict = spm.predict(imageToTest)
+    #cv2.imwrite("results/finalPredicted.png",predict)
+    #message = "Time -" + str(datetime.datetime.now() - start)
+    #print(message)

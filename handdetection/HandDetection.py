@@ -1,5 +1,25 @@
 import cv2
 import numpy as np
+from sklearn.naive_bayes import GaussianNB
+
+def ReadData():
+    print("Reading Data")
+    #Data in format [B G R Label] from
+    data = np.genfromtxt('data/Skin_NonSkin.txt', dtype=np.int)
+    #data = np.genfromtxt('data/facedata.txt', dtype=np.int8)
+    labels= data[:,3]
+    data= data[:,0:3]
+    #training_data = cv2.ml.TrainData_create(data, labels)
+    #labelMat = cv2.ml.TrainData_create(labels, cv2.ml.ROW_SAMPLE)
+    #dataMat.convertTo(dataMatConv, cv2.CV_32F)
+    #labelMat.convertTo(labelMatConv, cv2.CV_32F)
+    return data,labels
+
+data,labels = ReadData()
+#classifer = GaussianNB()
+nb = cv2.ml.NormalBayesClassifier_create()
+train = nb.train(data, cv2.ml.ROW_SAMPLE, labels)
+
 
 def diffImg(t0, t1, t2):
   d1 = cv2.absdiff(t2, t1)
@@ -9,10 +29,9 @@ def diffImg(t0, t1, t2):
 #Open Camera object
 capture = cv2.VideoCapture(0)
 
-
 #Decrease frame size
-capture.set(cv2.CAP_PROP_FRAME_WIDTH,  400)
-capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 400)
+capture.set(cv2.CAP_PROP_FRAME_WIDTH,  300)
+capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 300)
 
 # Creating a window for HSV track bars
 cv2.namedWindow('HSV_TrackBar')
@@ -66,6 +85,15 @@ while(True):
     median_motion = cv2.medianBlur(dilation2,5)
     motion_and_background = cv2.add(median_motion,fgmask)
 
+    #blurdata= np.reshape(blur,(blur.shape[0]*blur.shape[1],3))
+    #hsvsdat = np.reshape(hsv,(hsv.shape[0]*hsv.shape[1],3))
+
+    #rgbPredict = clf.predict(blurdata)
+    #hsvPredict = clf.predict(hsvsdat)
+    #prediction = cv2.bitwise_and(rgbPredict, hsvPredict)
+    #cv2.imshow("prediction", prediction)
+    #print(prediction)
+    #nb = cv2.ml.NormalBayesClassifier_create()
     #Create a binary image with where white will be skin colors and rest is black
     mask2 = cv2.inRange(hsv,np.array([2,50,50]),np.array([15,255,255]))
 
@@ -166,5 +194,6 @@ while(True):
     k = cv2.waitKey(5) & 0xFF
     if k == 27:
         break
+
 capture.release()
 cv2.destroyAllWindows()
