@@ -24,35 +24,6 @@ class SkinProbabiltyMap:
             mask = cv2.imread(binaryImageFile)[:,:,0]
             self.fit(trainImage,mask)
 
-        self.lookupsh = dict()
-        for i in range(0,self.skin_histogram.shape[0]):
-            d = dict()
-            for j in range(0,self.skin_histogram.shape[1]):
-                d[j] = self.skin_histogram[i,j]
-            self.lookupsh[i] = d
-
-        self.lookupnsh = dict()
-        for i in range(0,self.non_skin_histogram.shape[0]):
-            d = dict()
-            for j in range(0,self.non_skin_histogram.shape[1]):
-                d[j] = self.non_skin_histogram[i,j]
-            self.lookupnsh[i] = d
-
-        self.lookuphsh = dict()
-        for i in range(0,self.hsv_skin_histogram.shape[0]):
-            d = dict()
-            for j in range(0,self.hsv_skin_histogram.shape[1]):
-                d[j] = self.hsv_skin_histogram[i,j]
-            self.lookuphsh[i] = d
-
-        self.lookupnhsh = dict()
-        for i in range(0,self.hsv_non_skin_histogram.shape[0]):
-            d = dict()
-            for j in range(0,self.hsv_non_skin_histogram.shape[1]):
-                d[j] = self.hsv_non_skin_histogram[i,j]
-            self.lookupnhsh[i] = d
-
-
     def bootstrap(self,image):
         hsv = cv2.cvtColor(image,cv2.COLOR_BGR2HSV)
         normalisedRGB = self.getNormalisedRGB(image)
@@ -86,7 +57,7 @@ class SkinProbabiltyMap:
         #self.visualiseHist(self.skin_histogram,self.hist_bin,"skin hist")
         #self.visualiseHist(self.non_skin_histogram,self.hist_bin,"non skin hist")
 
-    """def predict(self,image):
+    def predict(self,image):
         result = np.zeros((image.shape[0]*image.shape[1]),np.uint8)
         hsv_result = np.zeros((image.shape[0]*image.shape[1]),np.uint8)
 
@@ -129,13 +100,13 @@ class SkinProbabiltyMap:
 
         message = "Iteration -" + str(datetime.datetime.now() - start)
         print(message)
-
-
+        cv2.imwrite("results/hsvResult.png",hsv_result)
+        cv2.imwrite("results/rgbResult.png",result)
         final = cv2.bitwise_and(hsv_result, result)
         reshape = np.reshape(final, (image.shape[0], image.shape[1]))
-        return reshape"""
+        return reshape
 
-    def predict(self,image):
+    """def predict(self,image):
         size = image.shape[0]*image.shape[1]
         nrgb = self.normalizeRGB(image)
         hsv = cv2.cvtColor(image,cv2.COLOR_RGB2HSV)
@@ -159,7 +130,7 @@ class SkinProbabiltyMap:
         print(message)
         #final = cv2.bitwise_and(prediction[0], prediction[1])
         reshape = np.reshape(final, (image.shape[0], image.shape[1]))
-        return reshape
+        return reshape"""
 
     def predictLoop2(self,ndarray,hsvndArrap,size):
         hsv_result = np.zeros(size,np.uint8)
@@ -278,7 +249,9 @@ class SkinProbabiltyMap:
 if __name__ == "__main__":
     spm = SkinProbabiltyMap()
     start = datetime.datetime.now()
-    imageToTest = cv2.imread("Images/josh-hartnett-Poster-thumb.jpg")
+    #imageToTest = cv2.imread("Images/josh-hartnett-Poster-thumb.jpg")
+    cap = cv2.VideoCapture(0)
+    ret, imageToTest = cap.read()
     predict = spm.predict(imageToTest)
     cv2.imwrite("results/finalPredicted.png",predict)
     message = "Time -" + str(datetime.datetime.now() - start)

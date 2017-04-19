@@ -1,5 +1,4 @@
 import os
-from skimage.io import imread
 import cv2
 import numpy as np
 
@@ -56,4 +55,22 @@ def normalizeRGB(img):
     img_output = cv2.cvtColor(img_yuv, cv2.COLOR_YUV2BGR)
     return img_output
 
-readData()
+def bootstrap(image,count):
+    blur = cv2.blur(image,(3,3))
+    hsv = cv2.cvtColor(blur,cv2.COLOR_BGR2HSV)
+    predictedImage = cv2.inRange(hsv,np.array([2,50,50]),np.array([15,255,255]))
+    cv2.imwrite("results/Predicted"+str(count)+".png", predictedImage)
+    data = np.reshape(hsv,(hsv.shape[0] * hsv.shape[1], 3))
+    labels = np.reshape(predictedImage,(predictedImage.shape[0] * predictedImage.shape[1], 1))
+    hsvtrain = np.concatenate((data,labels),axis=1)
+    np.savetxt("data/realtimehsv/hsvRealTime"+str(count)+".csv", hsvtrain, delimiter=",",newline='\n',fmt='%3d')
+
+cap = cv2.VideoCapture(0)
+cnt = 10
+while(cnt >= 0):
+    print(cnt)
+    ret, frame = cap.read()
+    bootstrap(frame,cnt)
+    cnt = cnt -1
+cap.release()
+cv2.destroyAllWindows()

@@ -1,13 +1,12 @@
-from handdetection.Learning import Learning
 from handdetection.Capture import Capture
 
-#learning = Learning('data/Skin_NonSkin.txt')
-from handdetection.SkinProbabiltyMap import SkinProbabiltyMap
-from handdetection.tree import Tree
+from handdetection.SPM import SPM
+import pickle
 
 if __name__ == "__main__":
-    learning = Tree()
-    cap = Capture(learning)
+    file = open('SPMPickle.pkl','rb')
+    classifier = pickle.load(file)
+    cap = Capture(classifier)
     cap.startCapture()
     print('Destroying')
     cap.destroy()
