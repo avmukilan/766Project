@@ -58,7 +58,7 @@ class Capture:
 
             ret,thresh = cv2.threshold(processed,127,255,0)
             image,contours, _ = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
-            max_area=1000
+            max_area=3000
 
             for i in range(len(contours)):
                 cnt=contours[i]
@@ -110,13 +110,14 @@ class Capture:
                     for i in range(0,len(fingers)):
                         distance = np.sqrt(np.power(fingers[i][0] - center_mass[0], 2) + np.power(fingers[i][1] - center_mass[0], 2))
                         fingerDistance.append(distance)
-                    result = 0
-                    for i in range(0,len(fingers)):
-                        if fingerDistance[i] > average_Defect_Distance+130:
-                            result = result +1
+                    #result = 0
+                    #for i in range(0,len(fingers)):
+                    #    if fingerDistance[i] > average_Defect_Distance+130:
+                    #        result = result +1
 
                     #cv2.putText(frame,str(result),(100,100),font,2,(0,0,0),2)
                     x,y,w,h = cv2.boundingRect(cnts)
+                    img = cv2.rectangle(frame,(x,y),(x+w,y+h),(0,255,0),2)
                     cv2.drawContours(frame,[hull],-1,(255,255,255),2)
             cv2.imshow('Original',frame)
 
