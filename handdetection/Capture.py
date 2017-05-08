@@ -5,14 +5,16 @@ class Capture:
 
     def __init__(self,learning):
         self.cap = cv2.VideoCapture(0)
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH,  300)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 300)
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH,  400)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 400)
         cv2.namedWindow('RealTimeHandDetection')
         self.t_minus = cv2.cvtColor(self.cap.read()[1], cv2.COLOR_RGB2GRAY)
         self.t = cv2.cvtColor(self.cap.read()[1], cv2.COLOR_RGB2GRAY)
         self.t_plus  = cv2.cvtColor(self.cap.read()[1], cv2.COLOR_RGB2GRAY)
         self.bgsub = cv2.createBackgroundSubtractorKNN()
         self.skinClassifier = learning
+        self.processed_old = self.t_minus
+        self.processed = self.t
 
     def callableObject(x):
         pass
@@ -24,6 +26,8 @@ class Capture:
 
     def startCapture(self):
         face = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
+        fingerdetect = cv2.CascadeClassifier('cascade.xml')
+        handetect = cv2.CascadeClassifier('hand.xml') # detected closed palm
 
         while(True):
             kernel_square = np.ones((11,11),np.uint8)
@@ -31,6 +35,8 @@ class Capture:
             ret, frame = self.cap.read()
             fgmask = self.bgsub.apply(frame)
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            blur = cv2.blur(frame,(3,3))
+            hsv = cv2.cvtColor(blur,cv2.COLOR_BGR2HSV)
 
             self.t_minus = self.t
             self.t = self.t_plus
@@ -40,21 +46,35 @@ class Capture:
             motion_and_background = cv2.bitwise_or(thresh_motion,fgmask)
 
             cv2.imshow("Motion With Background Subtraction", motion_and_background)
-            predictedImage = self.skinClassifier.predict(frame)
+            newFrame = cv2.bitwise_and(frame,frame,mask=motion_and_background)
+            predictedImage = self.skinClassifier.predict(newFrame)
             cv2.imshow("Predicted " , predictedImage)
 
             processed = cv2.bitwise_and(motion_and_background, motion_and_background, mask=predictedImage)
-            facepixels = face.detectMultiScale(gray,1.3,5)
 
             dilation = cv2.dilate(processed,kernel_square,iterations = 1)
             erosion = cv2.erode(dilation,kernel_square,iterations = 1)
             dilation2 = cv2.dilate(erosion,kernel_ellipse,iterations = 1)
             processed = cv2.medianBlur(dilation2,5)
 
-            for (x,y,w,h) in facepixels:
-                processed[x:x+w,y:y+h] = [0]
-
             cv2.imshow("Processed", processed)
+
+            maskedFrame = cv2.bitwise_and(frame,frame,mask=processed)
+            cv2.imshow("Processed Frame",maskedFrame)
+            grayFrame = cv2.cvtColor(maskedFrame, cv2.COLOR_BGR2GRAY)
+            cv2.imshow("GrayScale",grayFrame)
+            facepixels = face.detectMultiScale(grayFrame,1.3,5)
+
+            for (x,y,w,h) in facepixels:
+                processed[x:x+w,y:y+h] = [0,0,0]
+
+            fingerPixels = fingerdetect.detectMultiScale(maskedFrame,1.3,5)
+            handpixels = handetect.detectMultiScale(maskedFrame,1.3,5)
+
+            #for (x,y,w,h) in handpixels:
+            #    frame[y:y+h,x:x+w] = [255,255,255]
+            #for (x,y,w,h) in fingerPixels:
+            #    frame[y:y+h,x:x+w] = [255,255,255]
 
             ret,thresh = cv2.threshold(processed,127,255,0)
             image,contours, _ = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
@@ -110,16 +130,16 @@ class Capture:
                     for i in range(0,len(fingers)):
                         distance = np.sqrt(np.power(fingers[i][0] - center_mass[0], 2) + np.power(fingers[i][1] - center_mass[0], 2))
                         fingerDistance.append(distance)
-                    #result = 0
-                    #for i in range(0,len(fingers)):
-                    #    if fingerDistance[i] > average_Defect_Distance+130:
-                    #        result = result +1
+                    result = 0
+                    for i in range(0,len(fingers)):
+                        if fingerDistance[i] > average_Defect_Distance+130:
+                            result = result +1
 
-                    #cv2.putText(frame,str(result),(100,100),font,2,(0,0,0),2)
+                    #cv2.putText(frame,str(result),(150,100),font,2,(255,255,255),2)
                     x,y,w,h = cv2.boundingRect(cnts)
                     img = cv2.rectangle(frame,(x,y),(x+w,y+h),(0,255,0),2)
                     cv2.drawContours(frame,[hull],-1,(255,255,255),2)
-            cv2.imshow('Original',frame)
+            cv2.imshow('Detection',frame)
 
             k = cv2.waitKey(5) & 0xFF
             if k == 27:
@@ -127,5 +147,7 @@ class Capture:
 
 
     def destroy(self):
+        fps = self.cap.get(cv2.CAP_PROP_FRAME_COUNT)
+        print(fps)
         self.cap.release()
         cv2.destroyAllWindows()
